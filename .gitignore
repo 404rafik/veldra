@@ -1,0 +1,18 @@
+# Dependencies
+node_modules/
+vendor/
+composer.lock
+
+# Build output (tracker is built from source)
+build/*.min.js
+!build/.gitkeep
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo

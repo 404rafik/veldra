@@ -1,0 +1,110 @@
+/* Veldra Dashboard Styles — loaded only in WP-Admin */
+
+.veldra-dashboard {
+  max-width: 1200px;
+}
+
+.veldra-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.veldra-select {
+  min-width: 180px;
+}
+
+.veldra-custom-range {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.veldra-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.veldra-card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 20px;
+  text-align: center;
+}
+
+.veldra-card-label {
+  display: block;
+  font-size: 12px;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 8px;
+}
+
+.veldra-card-value {
+  display: block;
+  font-size: 28px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.veldra-chart-container {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.veldra-chart-container h2 {
+  margin-top: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.veldra-chart-container canvas {
+  width: 100% !important;
+  height: 300px !important;
+}
+
+.veldra-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+@media (max-width: 782px) {
+  .veldra-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.veldra-table-container table {
+  width: 100%;
+}
+
+.veldra-table-container code {
+  font-size: 11px;
+  background: #f3f4f6;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+/* Compliance widget */
+.veldra-compliance ul {
+  list-style: none;
+  padding: 0;
+}
+
+.veldra-compliance li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+  font-size: 13px;
+}

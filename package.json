@@ -1,0 +1,14 @@
+{
+  "name": "veldra/tracker",
+  "private": true,
+  "scripts": {
+    "build": "esbuild assets/tracker/tracker.js --minify --outfile=build/tracker.min.js && esbuild assets/admin/dashboard.js --minify --outfile=build/dashboard.min.js",
+    "build:tracker": "esbuild assets/tracker/tracker.js --minify --outfile=build/tracker.min.js",
+    "build:admin": "esbuild assets/admin/dashboard.js --minify --outfile=build/dashboard.min.js",
+    "test:e2e": "playwright test"
+  },
+  "devDependencies": {
+    "esbuild": "^0.24.0",
+    "@playwright/test": "^1.45"
+  }
+}

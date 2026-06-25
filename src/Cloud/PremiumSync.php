@@ -114,7 +114,7 @@ class PremiumSync
         $results = $wpdb->get_results($wpdb->prepare(
             "SELECT path, country_code, device_type, browser_family,
                     referrer_host, utm_source, utm_campaign,
-                    sessions, pageviews, bounces
+                    sessions, pageviews, bounces, total_duration_ms
             FROM {$table}
             WHERE date = %s",
             $date

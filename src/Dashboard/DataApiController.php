@@ -146,20 +146,32 @@ class DataApiController
         $overview = $wpdb->get_row($wpdb->prepare(
             "SELECT COUNT(DISTINCT date) AS days,
                     COALESCE(SUM(sessions), 0) AS total_visits,
-                    COALESCE(SUM(pageviews), 0) AS total_pageviews
+                    COALESCE(SUM(pageviews), 0) AS total_pageviews,
+                    COALESCE(SUM(bounces), 0) AS total_bounces,
+                    COALESCE(SUM(total_duration_ms), 0) AS total_duration_ms
             FROM {$summary_tbl}
             WHERE date >= %s AND date <= %s AND path = ''",
             $start,
             $end
         ));
 
+        // Compute derived metrics
+        $bounce_rate    = $overview && $overview->total_visits > 0
+            ? round(($overview->total_bounces / $overview->total_visits) * 100, 1)
+            : 0.0;
+        $avg_duration_s = $overview && $overview->total_visits > 0
+            ? round($overview->total_duration_ms / $overview->total_visits / 1000, 1)
+            : 0.0;
+
         return new WP_REST_Response([
-            'traffic'     => $traffic,
-            'content'     => $top_content,
-            'referrers'   => $referrers,
-            'devices'     => $devices,
-            'countries'   => $countries,
-            'overview'    => $overview,
+            'traffic'      => $traffic,
+            'content'      => $top_content,
+            'referrers'    => $referrers,
+            'devices'      => $devices,
+            'countries'    => $countries,
+            'overview'     => $overview,
+            'bounce_rate'  => $bounce_rate,
+            'avg_duration' => $avg_duration_s,
         ]);
     }
 }

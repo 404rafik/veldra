@@ -18,6 +18,7 @@ interface TrackPayload {
     sessions: number;
     pageviews: number;
     bounces: number;
+    total_duration_ms?: number;
   }>;
 }
 
@@ -55,6 +56,7 @@ export async function trackRoute(app: FastifyInstance): Promise<void> {
                   sessions: { type: 'number' },
                   pageviews: { type: 'number' },
                   bounces: { type: 'number' },
+                  total_duration_ms: { type: 'number' },
                 },
               },
             },

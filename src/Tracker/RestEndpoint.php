@@ -61,13 +61,25 @@ class RestEndpoint
 
         // 2. Validate payload
         $params = $request->get_json_params();
-        if (!is_array($params) || empty($params['path'])) {
+        if (!is_array($params)) {
             return new WP_REST_Response(null, 400);
         }
 
-        $path      = $this->sanitize_path($params['path']);
-        $referrer  = $this->sanitize_referrer($params['referrer'] ?? '');
+        $path       = $this->sanitize_path($params['path'] ?? '');
+        $referrer   = $this->sanitize_referrer($params['referrer'] ?? '');
         $user_agent = $this->get_user_agent();
+        $entry_ms   = (int) ($params['ts'] ?? 0);
+        $duration_ms = isset($params['duration_ms']) ? (int) $params['duration_ms'] : null;
+
+        // If this is a heartbeat (duration_ms present), UPDATE the existing pageview row
+        if ($duration_ms !== null) {
+            $this->handle_heartbeat($entry_ms, $user_agent, $client_ip, $duration_ms);
+            return new WP_REST_Response(null, 204);
+        }
+
+        if (empty($path)) {
+            return new WP_REST_Response(null, 400);
+        }
 
         // 3. Geolocate (IP read transiently, never stored)
         $geo_data = $this->geo->resolve($client_ip);
@@ -92,7 +104,8 @@ class RestEndpoint
             $device_info['browser_family'],
             $utm['source'],
             $utm['medium'],
-            $utm['campaign']
+            $utm['campaign'],
+            $entry_ms
         );
 
         return new WP_REST_Response(null, 204);
@@ -111,7 +124,8 @@ class RestEndpoint
         string $browser_family,
         string $utm_source,
         string $utm_medium,
-        string $utm_campaign
+        string $utm_campaign,
+        int $entry_ms
     ): void {
         global $wpdb;
 
@@ -131,12 +145,59 @@ class RestEndpoint
                 'utm_source'     => $utm_source,
                 'utm_medium'     => $utm_medium,
                 'utm_campaign'   => $utm_campaign,
+                'entry_ms'       => $entry_ms,
             ],
             [
                 '%s', '%s', '%s', '%s', '%s',
-                '%s', '%s', '%s', '%s', '%s', '%s',
+                '%s', '%s', '%s', '%s', '%s', '%s', '%d',
             ]
         );
+    }
+
+    /**
+     * Handle a heartbeat request — match by session_hash + entry_ms and set duration/bounce.
+     */
+    private function handle_heartbeat(int $entry_ms, string $user_agent, string $client_ip, int $duration_ms): void
+    {
+        global $wpdb;
+
+        $table        = $wpdb->prefix . 'veldra_pageviews';
+        $session_hash = $this->hasher->hash($client_ip, $user_agent);
+        $is_bounce    = ($duration_ms < 30000) ? 1 : 0;
+
+        // Best-effort UPDATE — if the initial pageview arrived already (likely) the
+        // heartbeat matches on session_hash + entry_ms. If the INSERT raced the
+        // heartbeat (edge case on very fast navigations), we INSERT the row here.
+        $updated = $wpdb->update(
+            $table,
+            [
+                'duration_ms' => $duration_ms,
+                'is_bounce'   => $is_bounce,
+            ],
+            [
+                'session_hash' => $session_hash,
+                'entry_ms'     => $entry_ms,
+            ],
+            ['%d', '%d'],
+            ['%s', '%d']
+        );
+
+        // No row matched — likely a race condition where the heartbeat arrived first.
+        // Insert a minimal row with the duration data so we don't lose the heartbeat.
+        if ($updated === 0) {
+            $wpdb->insert(
+                $table,
+                [
+                    'date'         => current_time('Y-m-d'),
+                    'path'         => '(heartbeat)',
+                    'session_hash' => $session_hash,
+                    'entry_ms'     => $entry_ms,
+                    'duration_ms'  => $duration_ms,
+                    'is_bounce'    => $is_bounce,
+                ],
+                ['%s', '%s', '%s', '%d', '%d', '%d']
+            );
+        }
     }
 
     /**
@@ -281,7 +342,7 @@ class RestEndpoint
     {
         return [
             'path' => [
-                'required'          => true,
+                'required'          => false,
                 'type'              => 'string',
                 'sanitize_callback' => 'sanitize_text_field',
             ],
@@ -306,6 +367,14 @@ class RestEndpoint
             ],
             'utm_campaign' => [
                 'type' => 'string',
+            ],
+            'ts' => [
+                'required'          => true,
+                'type'              => 'integer',
+            ],
+            'duration_ms' => [
+                'required'          => false,
+                'type'              => 'integer',
             ],
         ];
     }

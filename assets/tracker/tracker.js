@@ -1,8 +1,9 @@
 /**
  * Veldra Tracker — Privacy-first analytics script.
  *
- * Injects a single pageview event on load. No cookies, no localStorage,
- * no fingerprinting. Uses navigator.sendBeacon with fetch fallback.
+ * Injects a single pageview event on load. Sends a heartbeat on page exit
+ * to capture session duration. No cookies, no localStorage, no fingerprinting.
+ * Uses navigator.sendBeacon with fetch fallback.
  *
  * @see /wp-json/veldra/v1/track
  * @license GPL-2.0-or-later
@@ -13,6 +14,10 @@
   // ── Configuration ──────────────────────────────────────────────────
   var config = window.VELDRA_CONFIG || {};
   var endpoint = config.endpoint || '/wp-json/veldra/v1/track';
+
+  // ── Page-load timestamp ────────────────────────────────────────────
+  var pageLoadTs = Date.now();
+  var heartbeatSent = false;
 
   // ── Utilities ──────────────────────────────────────────────────────
 
@@ -48,6 +53,7 @@
       utm_source: getParam('utm_source'),
       utm_medium: getParam('utm_medium'),
       utm_campaign: getParam('utm_campaign'),
+      ts: pageLoadTs,
     };
   }
 
@@ -72,6 +78,31 @@
       }
     }
   }
+
+  /** Send a heartbeat with session duration on page exit */
+  function sendHeartbeat() {
+    if (heartbeatSent) return;
+    heartbeatSent = true;
+
+    var duration_ms = Date.now() - pageLoadTs;
+    // Skip sub-second visits (tab spamming, redirects)
+    if (duration_ms < 1000) return;
+
+    var payload = buildPayload();
+    payload.duration_ms = duration_ms;
+    send(payload);
+  }
+
+  // ── Exit detection ────────────────────────────────────────────────
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'hidden') {
+      sendHeartbeat();
+    }
+  });
+
+  window.addEventListener('beforeunload', function () {
+    sendHeartbeat();
+  });
 
   // ── Init ───────────────────────────────────────────────────────────
   // Fire on DOMContentLoaded to avoid blocking rendering

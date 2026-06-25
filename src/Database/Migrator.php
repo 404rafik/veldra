@@ -78,9 +78,11 @@ class Migrator
             utm_source    VARCHAR(255)    DEFAULT NULL,
             utm_medium    VARCHAR(255)    DEFAULT NULL,
             utm_campaign  VARCHAR(255)    DEFAULT NULL,
+            entry_ms      BIGINT UNSIGNED NOT NULL COMMENT 'Page-load timestamp (epoch ms), used to match heartbeats',
+            duration_ms   INT UNSIGNED    DEFAULT NULL COMMENT 'Session duration in ms, set by exit heartbeat',
+            is_bounce     TINYINT(1)      NOT NULL DEFAULT 0 COMMENT '1 if session had 1 pageview and duration < 30s',
             PRIMARY KEY (id),
-            INDEX idx_date_path (date, path(255)),
-            INDEX idx_session (session_hash),
+            INDEX idx_session_entry (session_hash, entry_ms),
             INDEX idx_date (date)
         ) {$charset_collate} ENGINE=InnoDB;";
     }
@@ -125,6 +127,7 @@ class Migrator
             sessions       INT UNSIGNED                        NOT NULL DEFAULT 0,
             pageviews      INT UNSIGNED                        NOT NULL DEFAULT 0,
             bounces        INT UNSIGNED                        NOT NULL DEFAULT 0,
+            total_duration_ms BIGINT UNSIGNED                   NOT NULL DEFAULT 0,
             PRIMARY KEY (date, path(255), country_code, device_type, browser_family, referrer_host(100), utm_source(100), utm_campaign(100)),
             INDEX idx_date (date)
         ) {$charset_collate} ENGINE=InnoDB;";
@@ -153,27 +156,39 @@ class Migrator
         $agg_date = gmdate('Y-m-d', strtotime('-1 day'));
 
         // phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+        // Session-level stats: total pageviews and max duration per session
+        // A bounce = session with exactly 1 pageview AND (duration < 30s OR unknown)
         $wpdb->query($wpdb->prepare(
             "INSERT INTO {$summary_tbl}
-                (date, path, country_code, device_type, browser_family, referrer_host, utm_source, utm_campaign, sessions, pageviews, bounces)
+                (date, path, country_code, device_type, browser_family, referrer_host, utm_source, utm_campaign, sessions, pageviews, bounces, total_duration_ms)
             SELECT
-                date,
-                COALESCE(path, ''),
-                COALESCE(country_code, ''),
-                COALESCE(device_type, ''),
-                COALESCE(browser_family, ''),
-                COALESCE(referrer_host, ''),
-                COALESCE(utm_source, ''),
-                COALESCE(utm_campaign, ''),
-                COUNT(DISTINCT session_hash) AS sessions,
+                p.date,
+                COALESCE(p.path, ''),
+                COALESCE(p.country_code, ''),
+                COALESCE(p.device_type, ''),
+                COALESCE(p.browser_family, ''),
+                COALESCE(p.referrer_host, ''),
+                COALESCE(p.utm_source, ''),
+                COALESCE(p.utm_campaign, ''),
+                COUNT(DISTINCT p.session_hash) AS sessions,
                 COUNT(*) AS pageviews,
-                0 AS bounces -- bounce detection requires session-level duration tracking, deferred
-            FROM {$pageviews_tbl}
-            WHERE date = %s
-            GROUP BY date, path, country_code, device_type, browser_family, referrer_host, utm_source, utm_campaign
+                COUNT(DISTINCT CASE WHEN s.total_pv = 1 AND (p.duration_ms IS NULL OR p.duration_ms < 30000) THEN p.session_hash END) AS bounces,
+                COALESCE(SUM(p.duration_ms), 0) AS total_duration_ms
+            FROM {$pageviews_tbl} p
+            INNER JOIN (
+                SELECT session_hash, date, COUNT(*) AS total_pv
+                FROM {$pageviews_tbl}
+                WHERE date = %s
+                GROUP BY session_hash, date
+            ) s ON p.session_hash = s.session_hash AND p.date = s.date
+            WHERE p.date = %s
+            GROUP BY p.date, p.path, p.country_code, p.device_type, p.browser_family, p.referrer_host, p.utm_source, p.utm_campaign
             ON DUPLICATE KEY UPDATE
-                sessions  = VALUES(sessions),
-                pageviews = VALUES(pageviews)",
+                sessions          = VALUES(sessions),
+                pageviews         = VALUES(pageviews),
+                bounces           = VALUES(bounces),
+                total_duration_ms = VALUES(total_duration_ms)",
+            $agg_date,
             $agg_date
         ));
 

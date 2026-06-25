@@ -117,7 +117,7 @@
   }
 
   /** Update the overview cards */
-  function updateCards(overview) {
+  function updateCards(overview, bounce_rate, avg_duration) {
     if (!overview) return;
     var setText = function (id, val) {
       var el = document.getElementById(id);
@@ -125,8 +125,23 @@
     };
     setText('veldra-visitors', fmt(overview.total_visits));
     setText('veldra-pageviews', fmt(overview.total_pageviews));
-    setText('veldra-bounce', '—');
-    setText('veldra-duration', '—');
+
+    // Bounce rate — format as percentage
+    var bounceDisplay = (bounce_rate != null) ? bounce_rate.toFixed(1) + '%' : '\u2014';
+    setText('veldra-bounce', bounceDisplay);
+
+    // Average duration — format as m:ss or s
+    var durDisplay = '\u2014';
+    if (avg_duration != null && avg_duration > 0) {
+      if (avg_duration >= 60) {
+        var min = Math.floor(avg_duration / 60);
+        var sec = Math.round(avg_duration % 60);
+        durDisplay = min + 'm ' + sec + 's';
+      } else {
+        durDisplay = Math.round(avg_duration) + 's';
+      }
+    }
+    setText('veldra-duration', durDisplay);
   }
 
   /** Main dashboard update */
@@ -139,7 +154,7 @@
         instance.destroy();
       });
 
-      updateCards(data.overview);
+      updateCards(data.overview, data.bounce_rate, data.avg_duration);
       renderTrafficChart(data.traffic);
       renderDeviceChart(data.devices);
       renderTable('veldra-top-content', data.content, [

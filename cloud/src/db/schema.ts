@@ -23,6 +23,7 @@ export const dailySummary = pgTable(
     sessions: bigint('sessions', { mode: 'number' }).notNull().default(0),
     pageviews: bigint('pageviews', { mode: 'number' }).notNull().default(0),
     bounces: bigint('bounces', { mode: 'number' }).notNull().default(0),
+    totalDurationMs: bigint('total_duration_ms', { mode: 'number' }).notNull().default(0),
   },
   (table) => ({
     pk: uniqueIndex('pk_daily_summary').on(
